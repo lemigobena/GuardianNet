@@ -1,0 +1,208 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Status {
+  SUBMITTED
+  RESPONDING
+  ON_SCENE
+  STABILIZED
+  UNDER_INVESTIGATION
+  CLOSED
+}
+
+// ----------------------------------------------------
+// ROLE TABLES
+// ----------------------------------------------------
+
+model Citizen {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  biometric_registered Boolean  @default(false)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+
+  reportedIncidents Incident[] @relation("CitizenIncidents")
+}
+
+model PatrolOfficer {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  biometric_registered Boolean  @default(false)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+}
+
+model Detective {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  biometric_registered Boolean  @default(false)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+
+  handledCases     Case[]     @relation("DetectiveCases")
+  uploadedEvidence Evidence[] @relation("DetectiveEvidence")
+}
+
+model Supervisor {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  biometric_registered Boolean  @default(false)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+}
+
+model Prosecutor {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  biometric_registered Boolean  @default(false)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+}
+
+model JudicialAdmin {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  biometric_registered Boolean  @default(false)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+}
+
+model ForensicOfficer {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  biometric_registered Boolean  @default(false)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+
+  uploadedEvidence Evidence[]       @relation("ForensicEvidence")
+  reports          ForensicReport[] @relation("ForensicReports")
+}
+
+model SystemAdmin {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  biometric_registered Boolean  @default(false)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+}
+
+// ----------------------------------------------------
+// ENTITY TABLES
+// ----------------------------------------------------
+
+model Incident {
+  id          String   @id @default(uuid())
+  citizenId   String
+  description String
+  location    String
+  status      Status   @default(SUBMITTED)
+  createdAt   DateTime @default(now())
+
+  citizen Citizen @relation("CitizenIncidents", fields: [citizenId], references: [id])
+  case    Case?   @relation("IncidentCase")
+}
+
+model Case {
+  id             String   @id @default(uuid())
+  incidentId     String   @unique
+  detectiveId    String?
+  classification String?
+  status         String   @default("OPEN")
+  locked         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  incident  Incident         @relation("IncidentCase", fields: [incidentId], references: [id])
+  detective Detective?       @relation("DetectiveCases", fields: [detectiveId], references: [id])
+  evidence  Evidence[]       @relation("CaseEvidence")
+  suspects  Suspect[]        @relation("CaseSuspects")
+  reports   ForensicReport[] @relation("CaseReports")
+  courtRecs CourtRecord[]    @relation("CaseCourtRecords")
+}
+
+model Evidence {
+  id                String   @id @default(uuid())
+  caseId            String
+  type              String // DOCUMENT, IMAGE, VIDEO
+  fileUrl           String
+  description       String?
+  hashSignature     String?
+  chainOfCustodyLog Json     @default("[]")
+  createdAt         DateTime @default(now())
+
+  // An evidence file can be uploaded by either a Detective or a Forensic Officer
+  detectiveId       String?
+  forensicOfficerId String?
+
+  case            Case             @relation("CaseEvidence", fields: [caseId], references: [id])
+  detective       Detective?       @relation("DetectiveEvidence", fields: [detectiveId], references: [id])
+  forensicOfficer ForensicOfficer? @relation("ForensicEvidence", fields: [forensicOfficerId], references: [id])
+}
+
+model Suspect {
+  id                 String  @id @default(uuid())
+  caseId             String
+  name               String
+  biometricReference String?
+
+  case Case @relation("CaseSuspects", fields: [caseId], references: [id])
+}
+
+model ForensicReport {
+  id              String   @id @default(uuid())
+  caseId          String
+  officerId       String
+  findings        String
+  type            String   @default("GENERAL_ANALYSIS")
+  resultSummary   String?
+  confidenceScore Float?
+  createdAt       DateTime @default(now())
+
+  case    Case            @relation("CaseReports", fields: [caseId], references: [id])
+  officer ForensicOfficer @relation("ForensicReports", fields: [officerId], references: [id])
+}
+
+model CourtRecord {
+  id        String   @id @default(uuid())
+  caseId    String
+  charge    String
+  verdict   String
+  sentence  String?
+  createdAt DateTime @default(now())
+
+  case Case @relation("CaseCourtRecords", fields: [caseId], references: [id])
+}
+
+model AuditLog {
+  id       String @id @default(uuid())
+  // We store strings instead of relational IDs here, so that an Audit Log can generically represent
+  // actions across all 8 roles without needing 8 nullable foreign keys
+  userRole String // e.g. "DETECTIVE", "SYSTEM_ADMIN"
+  userId   String // the UUID from the specific role table
+
+  action            String
+  details           String?
+  ipAddress         String?
+  biometricVerified Boolean  @default(false)
+  createdAt         DateTime @default(now())
+}
