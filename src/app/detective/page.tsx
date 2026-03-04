@@ -85,17 +85,51 @@ export default function DetectivePortal() {
         setPendingAction(null);
     };
 
-    const selectCase = (c: Case) => {
+    const selectCase = async (c: Case) => {
         setSelectedCase(c);
         setCaseInnerTab('timeline');
-        // In real app, we'd fetch evidence and reports here
-        setEvidenceList([
-            { id: 'E-1001', type: 'IMAGE', description: 'CCTV Footage snapshot', chainOfCustodyLog: 'Logged by Patrol -> Transferred to CID' },
-            { id: 'E-1002', type: 'DOCUMENT', description: 'Witness Statement', chainOfCustodyLog: 'Received at HQ' }
-        ]);
-        setReports([
-            { id: 'FR-992', findings: 'Awaiting lab results', status: 'PENDING' }
-        ]);
+
+        try {
+            const [evRes, repRes] = await Promise.all([
+                api.get(`/evidence/case/${c.id}`),
+                api.get(`/forensics/case/${c.id}`)
+            ]);
+            setEvidenceList(evRes.data);
+            setReports(repRes.data);
+        } catch (err) {
+            console.error('Failed to load case data', err);
+        }
+    };
+
+    const handleLogEvidence = async () => {
+        if (!selectedCase) return;
+        const desc = window.prompt('Enter evidence description:');
+        if (!desc) return;
+        try {
+            await api.post('/evidence', {
+                caseId: selectedCase.id,
+                description: desc,
+                type: 'DOCUMENT',
+                fileUrl: 'https://placeholder.com/evidence'
+            });
+            alert('Evidence securely logged to chain-of-custody.');
+            // Refresh
+            selectCase(selectedCase);
+        } catch (err) { alert('Failed to log evidence.'); }
+    };
+
+    const handleRequestAnalysis = async () => {
+        if (!selectedCase) return;
+        const findings = window.prompt('Enter forensic analysis directions/initial notes:');
+        if (!findings) return;
+        try {
+            await api.post('/forensics', {
+                caseId: selectedCase.id,
+                findings
+            });
+            alert('Lab analysis requested from Forensics Unit.');
+            selectCase(selectedCase);
+        } catch (err) { alert('Failed to request forensics.'); }
     };
 
     if (!user) return null;
@@ -305,7 +339,7 @@ export default function DetectivePortal() {
                                         <div className="flex justify-between items-center mb-6">
                                             <h3 className="text-xl font-bold flex items-center"><Database className="w-5 h-5 mr-3 text-[#8b5cf6]" /> Chain-of-Custody Manager</h3>
                                             {!selectedCase.locked && (
-                                                <button className="bg-[#262626] hover:bg-[#333] text-white text-sm px-4 py-2 rounded-lg font-semibold transition-colors flex items-center border border-[#333]">
+                                                <button onClick={handleLogEvidence} className="bg-[#262626] hover:bg-[#333] text-white text-sm px-4 py-2 rounded-lg font-semibold transition-colors flex items-center border border-[#333]">
                                                     <UploadCloud className="w-4 h-4 mr-2" /> Log Evidence
                                                 </button>
                                             )}
@@ -342,7 +376,7 @@ export default function DetectivePortal() {
                                         <div className="flex justify-between items-center mb-6">
                                             <h3 className="text-xl font-bold flex items-center"><FlaskConical className="w-5 h-5 mr-3 text-green-500" /> Lab Requests & Reports</h3>
                                             {!selectedCase.locked && (
-                                                <button className="bg-[#262626] hover:bg-[#333] text-white text-sm px-4 py-2 rounded-lg font-semibold transition-colors flex items-center border border-[#333]">
+                                                <button onClick={handleRequestAnalysis} className="bg-[#262626] hover:bg-[#333] text-white text-sm px-4 py-2 rounded-lg font-semibold transition-colors flex items-center border border-[#333]">
                                                     <LinkIcon className="w-4 h-4 mr-2" /> Request Analysis
                                                 </button>
                                             )}

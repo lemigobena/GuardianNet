@@ -173,6 +173,7 @@ model ForensicReport {
   caseId          String
   officerId       String
   findings        String
+  status          String   @default("PENDING")
   type            String   @default("GENERAL_ANALYSIS")
   resultSummary   String?
   confidenceScore Float?

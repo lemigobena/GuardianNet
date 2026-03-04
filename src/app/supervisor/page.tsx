@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuthStore from '../../store/authStore';
 import api from '../../utils/api';
-import { Activity, Users, FileText, AlertTriangle, LogOut, Map, ShieldAlert, Target, Shield, Eye, BarChart2 } from 'lucide-react';
+import { Activity, Users, FileText, AlertTriangle, LogOut, Map, ShieldAlert, Target, Shield, Eye, BarChart2, CheckCircle } from 'lucide-react';
 
 interface Incident { id: string; description: string; location: string; status: string; createdAt: string; }
 interface Case { id: string; classification: string; status: string; detectiveId: string | null; incident: Incident; createdAt: string; }
@@ -16,6 +16,7 @@ export default function SupervisorPortal() {
     const [activeTab, setActiveTab] = useState<'analytics' | 'assignment' | 'monitoring' | 'audits'>('analytics');
     const [incidents, setIncidents] = useState<Incident[]>([]);
     const [cases, setCases] = useState<Case[]>([]);
+    const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
     useEffect(() => {
         if (!user || user.role !== 'SUPERVISOR') {
@@ -27,12 +28,14 @@ export default function SupervisorPortal() {
 
     const fetchStats = async () => {
         try {
-            const [resInc, resCas] = await Promise.all([
+            const [resInc, resCas, resAudit] = await Promise.all([
                 api.get('/incidents'),
-                api.get('/cases')
+                api.get('/cases'),
+                api.get('/audits')
             ]);
             setIncidents(resInc.data);
             setCases(resCas.data);
+            setAuditLogs(resAudit.data);
         } catch (err) { }
     };
 
@@ -251,25 +254,22 @@ export default function SupervisorPortal() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#262626]">
-                                        {/* Mock Audit Flags for Supervisor */}
-                                        <tr className="hover:bg-[#202020] transition-colors">
-                                            <td className="px-6 py-4 font-mono text-gray-500">2026-03-04 14:32</td>
-                                            <td className="px-6 py-4"><span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded text-xs">PATROL_OFFICER</span></td>
-                                            <td className="px-6 py-4 text-gray-300">Rejected dispatch 3 times in one shift.</td>
-                                            <td className="px-6 py-4"><span className="text-yellow-500 font-bold text-xs"><AlertTriangle className="w-4 h-4 inline mr-1" /> WARNING</span></td>
-                                        </tr>
-                                        <tr className="hover:bg-[#202020] transition-colors">
-                                            <td className="px-6 py-4 font-mono text-gray-500">2026-03-04 11:15</td>
-                                            <td className="px-6 py-4"><span className="bg-purple-900/30 text-purple-400 px-2 py-1 rounded text-xs">DETECTIVE</span></td>
-                                            <td className="px-6 py-4 text-gray-300">Biometric override failed twice before case creation.</td>
-                                            <td className="px-6 py-4"><span className="text-red-500 font-bold text-xs"><AlertTriangle className="w-4 h-4 inline mr-1" /> CRITICAL</span></td>
-                                        </tr>
-                                        <tr className="hover:bg-[#202020] transition-colors">
-                                            <td className="px-6 py-4 font-mono text-gray-500">2026-03-03 09:44</td>
-                                            <td className="px-6 py-4"><span className="bg-gray-800 text-gray-400 px-2 py-1 rounded text-xs">UNKNOWN</span></td>
-                                            <td className="px-6 py-4 text-gray-300">Unauthorized access attempt to Case Workspace.</td>
-                                            <td className="px-6 py-4"><span className="text-red-500 font-bold text-xs"><Shield className="w-4 h-4 inline mr-1" /> BREACH</span></td>
-                                        </tr>
+                                        {auditLogs.slice(0, 20).map((log: any) => (
+                                            <tr key={log.id} className="hover:bg-[#202020] transition-colors">
+                                                <td className="px-6 py-4 font-mono text-gray-500">{new Date(log.createdAt).toLocaleString()}</td>
+                                                <td className="px-6 py-4"><span className="bg-purple-900/30 text-purple-400 px-2 py-1 rounded text-xs">{log.userRole}</span></td>
+                                                <td className="px-6 py-4 text-gray-300">{log.action}: {log.details || ''}</td>
+                                                <td className="px-6 py-4">
+                                                    {log.biometricVerified
+                                                        ? <span className="text-green-500 font-bold text-xs"><CheckCircle className="w-4 h-4 inline mr-1" /> VERIFIED</span>
+                                                        : <span className="text-yellow-500 font-bold text-xs"><AlertTriangle className="w-4 h-4 inline mr-1" /> STANDARD</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {auditLogs.length === 0 && (
+                                            <tr><td colSpan={4} className="text-center py-10 text-gray-500">No audit logs recorded.</td></tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

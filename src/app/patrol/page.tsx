@@ -41,10 +41,41 @@ export default function PatrolPortal() {
         }
     };
 
-    const handleRespond = (inc: Incident) => {
-        // Optimistically update status locally or hit an endpoint to accept dispatch
-        setSelectedIncident(inc);
-        setActiveTab('workspace');
+    const handleRespond = async (inc: Incident) => {
+        try {
+            await api.put(`/incidents/${inc.id}`, { status: 'RESPONDING' });
+            setSelectedIncident({ ...inc, status: 'RESPONDING' });
+            setActiveTab('workspace');
+            fetchIncidents();
+        } catch (err) {
+            alert("Failed to accept dispatch.");
+        }
+    };
+
+    const handleResolve = async () => {
+        if (!selectedIncident) return;
+        try {
+            await api.put(`/incidents/${selectedIncident.id}`, { status: 'CLOSED', descriptionUpdate: fieldNotes });
+            alert("Incident marked as resolved.");
+            fetchIncidents();
+            setActiveTab('alerts');
+            setSelectedIncident(null);
+            setFieldNotes('');
+        } catch (err) {
+            alert("Failed to resolve incident.");
+        }
+    };
+
+    const handleUpdateNotes = async () => {
+        if (!selectedIncident || !fieldNotes.trim()) return;
+        try {
+            await api.put(`/incidents/${selectedIncident.id}`, { descriptionUpdate: fieldNotes });
+            alert("Field notes appended to incident file securely.");
+            setFieldNotes('');
+            fetchIncidents(); // refreshing will pull down the new appended notes
+        } catch (err) {
+            alert("Failed to update notes.");
+        }
     };
 
     const handleEscalate = async () => {
@@ -192,8 +223,8 @@ export default function PatrolPortal() {
                                                 value={fieldNotes}
                                                 onChange={(e) => setFieldNotes(e.target.value)}
                                             />
-                                            <button className="mt-4 bg-[#262626] hover:bg-[#333] text-white px-6 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center">
-                                                <UploadCloud className="w-4 h-4 mr-2" /> Upload Field Evidence
+                                            <button onClick={handleUpdateNotes} className="mt-4 bg-[#262626] hover:bg-[#333] text-white px-6 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center">
+                                                <UploadCloud className="w-4 h-4 mr-2" /> Upload Field Evidence / Add Notes
                                             </button>
                                         </div>
                                     </div>
@@ -202,7 +233,7 @@ export default function PatrolPortal() {
                                         <div className="bg-[#171717] border border-[#262626] p-6 rounded-2xl">
                                             <h3 className="text-lg font-bold text-gray-300 mb-4 border-b border-[#262626] pb-2">Actions</h3>
                                             <div className="space-y-3">
-                                                <button className="w-full bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-black border border-yellow-500/30 px-4 py-3 rounded-xl font-bold transition-colors flex items-center justify-center">
+                                                <button onClick={handleResolve} className="w-full bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-black border border-yellow-500/30 px-4 py-3 rounded-xl font-bold transition-colors flex items-center justify-center">
                                                     Mark as Resolved
                                                 </button>
                                                 <button onClick={handleEscalate} className="w-full bg-purple-600 hover:bg-purple-500 text-white border border-purple-500/30 px-4 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-[0_0_15px_rgba(147,51,234,0.3)] flex items-center justify-center">

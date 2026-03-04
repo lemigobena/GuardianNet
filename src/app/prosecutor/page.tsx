@@ -18,6 +18,8 @@ export default function ProsecutorPortal() {
     const [selectedCase, setSelectedCase] = useState<Case | null>(null);
     const [sendbackReason, setSendbackReason] = useState('');
     const [showSendback, setShowSendback] = useState(false);
+    const [caseEvidence, setCaseEvidence] = useState<any[]>([]);
+    const [caseReports, setCaseReports] = useState<any[]>([]);
 
     useEffect(() => {
         if (!user || user.role !== 'PROSECUTOR') {
@@ -40,6 +42,36 @@ export default function ProsecutorPortal() {
         setShowSendback(false);
         setSendbackReason('');
         setSelectedCase(null);
+    };
+
+    const handleSelectCase = async (c: Case) => {
+        setSelectedCase(c);
+        try {
+            const [evRes, repRes] = await Promise.all([
+                api.get(`/evidence/case/${c.id}`),
+                api.get(`/forensics/case/${c.id}`)
+            ]);
+            setCaseEvidence(evRes.data);
+            setCaseReports(repRes.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleFileCharges = async () => {
+        if (!selectedCase) return;
+        const charge = window.prompt('Enter formal charge description:');
+        if (!charge) return;
+        try {
+            await api.post('/court', {
+                caseId: selectedCase.id,
+                charge,
+                verdict: 'PENDING'
+            });
+            alert('Formal charges filed. Case forwarded to Judicial Administration.');
+            setSelectedCase(null);
+            fetchData();
+        } catch (err) { alert('Failed to file charges.'); }
     };
 
     if (!user) return null;
@@ -107,7 +139,7 @@ export default function ProsecutorPortal() {
                                             <p className="text-sm text-gray-400 mt-2 max-w-2xl truncate">{c.incident?.description}</p>
                                         </div>
                                         <div className="flex space-x-3 ml-4">
-                                            <button onClick={() => setSelectedCase(c)} className="bg-[#262626] hover:bg-[#333] px-6 py-3 rounded-xl text-sm font-semibold text-white transition-colors border border-[#333] flex items-center">
+                                            <button onClick={() => handleSelectCase(c)} className="bg-[#262626] hover:bg-[#333] px-6 py-3 rounded-xl text-sm font-semibold text-white transition-colors border border-[#333] flex items-center">
                                                 Open File <ChevronRight className="w-4 h-4 ml-2" />
                                             </button>
                                         </div>
@@ -165,14 +197,21 @@ export default function ProsecutorPortal() {
                                         <div className="bg-[#171717] border border-[#262626] p-6 rounded-2xl shadow-lg">
                                             <h3 className="text-lg font-bold text-gray-300 mb-4 border-b border-[#262626] pb-2">Digital Evidence Registry</h3>
                                             <div className="space-y-3">
-                                                <div className="flex justify-between items-center bg-[#0a0a0a] p-3 rounded-lg border border-[#262626]">
-                                                    <span className="text-gray-300"><FileWarning className="w-4 h-4 inline mr-2 text-blue-500" /> Crime Scene Photos (4)</span>
-                                                    <button className="text-[#eab308] text-sm font-semibold">View File</button>
-                                                </div>
-                                                <div className="flex justify-between items-center bg-[#0a0a0a] p-3 rounded-lg border border-[#262626]">
-                                                    <span className="text-gray-300"><FileSearch className="w-4 h-4 inline mr-2 text-green-500" /> Forensic Report FR-992</span>
-                                                    <button className="text-[#eab308] text-sm font-semibold">View File</button>
-                                                </div>
+                                                {caseEvidence.map((ev: any) => (
+                                                    <div key={ev.id} className="flex justify-between items-center bg-[#0a0a0a] p-3 rounded-lg border border-[#262626]">
+                                                        <span className="text-gray-300"><FileWarning className="w-4 h-4 inline mr-2 text-blue-500" /> {ev.description || ev.type} ({ev.type})</span>
+                                                        <button className="text-[#eab308] text-sm font-semibold">View File</button>
+                                                    </div>
+                                                ))}
+                                                {caseReports.map((rep: any) => (
+                                                    <div key={rep.id} className="flex justify-between items-center bg-[#0a0a0a] p-3 rounded-lg border border-[#262626]">
+                                                        <span className="text-gray-300"><FileSearch className="w-4 h-4 inline mr-2 text-green-500" /> Forensic Report - {rep.status}</span>
+                                                        <button className="text-[#eab308] text-sm font-semibold">View File</button>
+                                                    </div>
+                                                ))}
+                                                {caseEvidence.length === 0 && caseReports.length === 0 && (
+                                                    <p className="text-gray-500 text-center py-4">No evidence files attached.</p>
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -182,7 +221,7 @@ export default function ProsecutorPortal() {
                                     <div className="bg-[#171717] border border-[#262626] p-6 rounded-2xl shadow-lg">
                                         <h3 className="text-lg font-bold text-gray-300 mb-4 border-b border-[#262626] pb-2">Prosecutorial Decision</h3>
                                         <div className="space-y-3">
-                                            <button className="w-full bg-[#10b981] hover:bg-emerald-500 text-[#0a0a0a] border border-[#10b981]/30 py-4 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center justify-center hover:scale-105">
+                                            <button onClick={handleFileCharges} className="w-full bg-[#10b981] hover:bg-emerald-500 text-[#0a0a0a] border border-[#10b981]/30 py-4 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center justify-center hover:scale-105">
                                                 <CheckCircle className="w-5 h-5 mr-2" /> File Formal Charges
                                             </button>
                                             <button onClick={() => setShowSendback(true)} className="w-full bg-[#262626] hover:bg-[#333] py-4 rounded-xl font-semibold text-white transition-colors border border-[#333] flex items-center justify-center">

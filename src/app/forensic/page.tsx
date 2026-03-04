@@ -14,6 +14,9 @@ export default function ForensicPortal() {
 
     const [activeTab, setActiveTab] = useState<'intake' | 'workspace' | 'reports'>('intake');
     const [cases, setCases] = useState<Case[]>([]);
+    const [pendingReports, setPendingReports] = useState<any[]>([]);
+    const [selectedReportCase, setSelectedReportCase] = useState('');
+    const [reportFindings, setReportFindings] = useState('');
 
     // Mock processing state
     const [isProcessing, setIsProcessing] = useState(false);
@@ -29,9 +32,44 @@ export default function ForensicPortal() {
 
     const fetchData = async () => {
         try {
-            const res = await api.get('/cases');
-            setCases(res.data);
+            const [casesRes, reportsRes] = await Promise.all([
+                api.get('/cases'),
+                api.get('/forensics')
+            ]);
+            setCases(casesRes.data);
+            setPendingReports(reportsRes.data.filter((r: any) => r.status === 'PENDING'));
         } catch (err) { }
+    };
+
+    const handleLogCustody = async (caseId: string) => {
+        const desc = window.prompt('Enter evidence description for chain-of-custody log:');
+        if (!desc) return;
+        try {
+            await api.post('/evidence', {
+                caseId,
+                description: desc,
+                type: 'FORENSIC_SAMPLE',
+                fileUrl: 'https://placeholder.com/forensic-evidence'
+            });
+            alert('Evidence logged to chain-of-custody successfully.');
+        } catch (err) { alert('Failed to log evidence.'); }
+    };
+
+    const handleSubmitReport = async () => {
+        if (!selectedReportCase || !reportFindings.trim()) {
+            alert('Please select a case and enter your findings.');
+            return;
+        }
+        try {
+            await api.post('/forensics', {
+                caseId: selectedReportCase,
+                findings: reportFindings,
+                type: 'LAB_ANALYSIS'
+            });
+            alert('Forensic report cryptographically signed and uploaded.');
+            setReportFindings('');
+            fetchData();
+        } catch (err) { alert('Failed to submit report.'); }
     };
 
     const runAnalysis = () => {
@@ -107,7 +145,7 @@ export default function ForensicPortal() {
                                             <p className="text-sm text-gray-400 mb-6 bg-[#0a0a0a] p-3 rounded-xl border border-[#262626]">Requires latent print extraction and DNA matching against AFIS.</p>
                                         </div>
                                         <div className="flex space-x-3 mt-auto">
-                                            <button className="flex-1 bg-[#262626] hover:bg-[#333] text-white px-4 py-3 rounded-lg text-sm font-semibold transition-colors border border-[#333] flex justify-center items-center">
+                                            <button onClick={() => handleLogCustody(c.id)} className="flex-1 bg-[#262626] hover:bg-[#333] text-white px-4 py-3 rounded-lg text-sm font-semibold transition-colors border border-[#333] flex justify-center items-center">
                                                 <Fingerprint className="w-4 h-4 mr-2" /> Log Chain-of-Custody
                                             </button>
                                         </div>
@@ -232,6 +270,13 @@ export default function ForensicPortal() {
                                     </div>
 
                                     <div>
+                                        <label className="block text-sm font-semibold text-gray-400 mb-2">Analysis Findings</label>
+                                        <textarea
+                                            className="w-full bg-[#0a0a0a] border border-[#262626] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 min-h-[120px]"
+                                            placeholder="Enter detailed forensic analysis findings..."
+                                            value={reportFindings}
+                                            onChange={(e) => setReportFindings(e.target.value)}
+                                        />
                                         <label className="block text-sm font-semibold text-gray-400 mb-2">Attached Asset (PDF/Encrypted Packet)</label>
                                         <div className="border-2 border-dashed border-[#262626] hover:border-teal-500/50 bg-[#0a0a0a] rounded-xl p-8 text-center transition-colors cursor-pointer group">
                                             <UploadCloud className="w-10 h-10 text-gray-500 group-hover:text-teal-500 mx-auto mb-3 transition-colors" />
@@ -240,8 +285,8 @@ export default function ForensicPortal() {
                                         </div>
                                     </div>
 
-                                    <button className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(20,184,166,0.2)] disabled:opacity-50 flex justify-center items-center mt-4">
-                                        <LinkIcon className="w-5 h-5 mr-2" /> Upload & cryptograph
+                                    <button onClick={handleSubmitReport} className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(20,184,166,0.2)] disabled:opacity-50 flex justify-center items-center mt-4">
+                                        <LinkIcon className="w-5 h-5 mr-2" /> Upload & Cryptograph
                                     </button>
                                 </div>
                             </div>

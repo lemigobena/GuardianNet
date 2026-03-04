@@ -48,14 +48,18 @@ export default function JudicialAdminPortal() {
     const handleBiometricSuccess = async (token: string) => {
         if (verdictPayload) {
             try {
-                // In reality, this would correctly hit PUT /api/court/:id with the token
-                // For mock, we'll optimistically update if no endpoint supports it yet
+                await api.put(`/court/${verdictPayload.id}`, {
+                    verdict: verdictPayload.verdict,
+                    sentence: verdictPayload.sentence
+                }, {
+                    headers: { 'x-biometric-token': token }
+                });
                 alert(`Verdict [${verdictPayload.verdict}] irreversibly sealed to chain.`);
                 fetchRecords(); // re-fetch
                 setSelectedRecordId(null);
                 setSentenceInput('');
-            } catch (err) {
-                alert('Failed to seal verdict.');
+            } catch (err: any) {
+                alert('Failed to seal verdict: ' + (err.response?.data?.error || err.message));
             }
         }
     };
